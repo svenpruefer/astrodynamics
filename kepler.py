@@ -3,6 +3,7 @@
 ##############################
 
 import numpy as np
+from scipy.optimize import fsolve
 
 #####################
 # Define parameters #
@@ -27,19 +28,24 @@ def norm(v):
 # Define class for celestial bodies. #
 ######################################
 
+# This works at the moment only for elliptical (generic) orbits. Fix this!
+
 class celestial_body:
     # This class assumes a reference coordinate system such that a large mass is situated at the origin. It might actually assume some more things.
     
     def __init__(self,mass,semi_major_axis,eccentricity,inclination,longitude_ascending_node,argument_periapsis,true_anomaly_epoch):
         # Initialization of class using classical orbital elements a, e, i, Omega, omega, nu_0
-        self.semi_major_axis = semi_major_axis
-        self.eccentricity = eccentricity
-        self.inclination = inclination
-        self.longitude_ascending_node = longitude_ascending_node
-        self.argument_periapsis = argument_periapsis
-        self.true_anomaly_epoch = true_anomaly_epoch
-        self.mass = mass
-        self.parameter = semi_major_axis * (1 - eccentricity**2)
+        self.semi_major_axis = semi_major_axis # a
+        self.eccentricity = eccentricity # e
+        self.inclination = inclination # i
+        self.longitude_ascending_node = longitude_ascending_node # Omega
+        self.argument_periapsis = argument_periapsis # omega
+        self.true_anomaly_epoch = true_anomaly_epoch # nu
+        self.mass = mass # m
+        self.parameter = semi_major_axis * (1 - eccentricity**2) # p
+        self.eccentric_anomaly = np.arccos((self.eccentricity + np.cos(self.true_anomaly_epoch)) / (1 + self.eccentricity * np.cos(self.true_anomaly_epoch))) # E
+        self.mean_anomaly = self.eccentric_anomaly - self.eccentricity * np.sin(self.eccentric_anomaly) # M
+        self.mean_motion = np.sqrt(mu / self.semi_major_axis**3 )# n
     
     @classmethod
     def from_position_velocity(self,mass,position,velocity):
@@ -80,6 +86,24 @@ class celestial_body:
         velocity = np.dot(rotation_matrix,velocity_perifocal_system)
         
         return position, velocity
+    
+    def advance_in_time(self,delta_t):
+        # This method advances the object on its course by delta t in time. This means that it needs to translate the time difference into changes in the true anomaly at epoch and then add this number to the existing value.
+        # delta_t should be small enough such that the body does not evolve more than one period. Is this necessary?
+        
+        # Update mean anomaly. Ignore full rotations.
+        new_mean_anomaly = self.mean_motion * delta_t + self.mean_anomaly
+        
+        # Solve E-e*sin(E)=M numerically
+        new_eccentric_anomaly = fsolve(lambda E : E - self.eccentricity * np.sin(E) -new_mean_anomaly,new_mean_anomaly) 
+        
+        # Calculate new true anomaly at epoch
+        new_true_anomaly_epoch = np.arccos( ( np.cos(new_eccentric_anomaly) - self.eccentricity ) / ( 1 - self.eccentricity * np.cos(new_eccentric_anomaly)))
+        
+        # Update values of true anomaly at epoch and eccentric anomaly and mean anomaly
+        self.true_anomaly_epoch = new_true_anomaly_epoch
+        self.mean_anomaly = new_mean_anomaly
+        self.eccentric_anomaly = new_eccentric_anomaly
 
 #############
 # Test Code #
@@ -88,7 +112,10 @@ class celestial_body:
 position = np.array([3.0 / 4 * np.sqrt(3), 3.0 /4, 0],float)
 velocity = np.array([-1.0/(2*np.sqrt(2)), np.sqrt(3) / (2 * np.sqrt(2)), 1.0 / np.sqrt(2)],float) 
 test_body = celestial_body.from_position_velocity(1,position,velocity)
-print(test_body.export_position_velocity())
+output = test_body.export_position_velocity()[0]
+print(output)
+test_body.advance_in_time(0.1)
+print(test_body.export_position_velocity()[0])
 
 
 
