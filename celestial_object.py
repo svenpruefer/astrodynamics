@@ -11,6 +11,12 @@ from scipy.optimize import fsolve
 
 def norm(v):
     return np.sqrt(np.dot(v,v))
+    
+def S(z):
+    return ( np.sqrt(z) - np.sin(np.sqrt(z)) ) / np.sqrt(z**3)
+
+def C(z):
+    return ( 1 - np.cos(np.sqrt(z)) ) / z
 
 ######################################
 # Define class for celestial bodies. #
@@ -43,6 +49,7 @@ class celestial_body:
         self.energy = - mu / ( 2.0 * self.semi_major_axis ) # E
         self.mu = mu # mu
         self.type = "elliptical"
+        self.X = 0 # X for universal formulation of time of flight
     
     @classmethod
     def from_position_velocity(self,mass,mu,position,velocity):
@@ -128,9 +135,16 @@ class celestial_body:
         self.true_anomaly_epoch = new_true_anomaly_epoch
         self.mean_anomaly = new_mean_anomaly
         self.eccentric_anomaly = new_eccentric_anomaly
-        
-        
     
+    def t_in_dep_of_X(self, X):
+        r_0, v_0 = self.export_postion_velocity()
+        return 1 / np.sqrt(self.mu) * ( np.dot(r_0,v_0) /np.sqrt(self.mu) * X**2 * C(X) + ( 1 - norm(r_0) / self.semi_major_axis ) * X**3 * S(X) + norm(r_0) * X )
+        
+    def advance_in_time_universal(self,delta_t):
+        # This method advances the object on its course by delta t in time using the universal time of fligt formulation. This means it should be usable for all kinds of orbits.
+        
+        # Solve for new X
+        new_X = fsolve(lambda X : self.t_in_dep_of_X(X) - delta_t,delta_t)
     
     def advance_in_true_anomaly(self,delta_nu):
         # This method increases the true anomaly by a given input. It can be used to find equi-distant-angle points on the orbit for visualization purposes. It also updates eccentric anomaly and mean anomaly.
