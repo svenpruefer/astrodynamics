@@ -32,10 +32,29 @@ class celestial_body:
     def __init__(self,mass,mu,semi_major_axis,eccentricity,inclination,longitude_ascending_node,argument_periapsis,true_anomaly_epoch):
         # Initialization of class using classical orbital elements a, e, i, Omega, omega, nu_0
         self.semi_major_axis = semi_major_axis # a
+        self.energy = - mu / ( 2.0 * self.semi_major_axis ) # E
         self.eccentricity = eccentricity # e
+        if self.energy < 0:
+            if self.eccentricity == 0:
+                self.type = "circular"
+            else:
+                self.type = "elliptical"
+        elif self.energy == 0:
+            self.type = "parabolic"
+        else:
+            self.type = "hyperbolic"
         self.inclination = inclination # i
-        self.longitude_ascending_node = longitude_ascending_node # Omega
-        self.argument_periapsis = argument_periapsis # omega
+        if inclination == 0:
+            self.planar == True
+        else:
+            self.planar == False
+        
+        if self.planar == False:
+            self.longitude_ascending_node = longitude_ascending_node # Omega
+            self.argument_periapsis = argument_periapsis # omega
+        else:
+            self.longitude_ascending_node = 0
+            self.argument_periapsis = 0
         self.true_anomaly_epoch = true_anomaly_epoch # nu
         self.mass = mass # m
         self.parameter = semi_major_axis * (1 - eccentricity**2) # p
@@ -46,9 +65,7 @@ class celestial_body:
         self.mean_anomaly = self.eccentric_anomaly - self.eccentricity * np.sin(self.eccentric_anomaly) # M
         self.mean_motion = np.sqrt(mu / self.semi_major_axis**3 ) # n
         self.period = 2 * np.pi / np.sqrt(mu) * np.sqrt(self.semi_major_axis**3) # T
-        self.energy = - mu / ( 2.0 * self.semi_major_axis ) # E
         self.mu = mu # mu
-        self.type = "elliptical"
         self.X = 0 # X for universal formulation of time of flight
     
     @classmethod
@@ -82,7 +99,11 @@ class celestial_body:
             body = celestial_body(mass,mu,semi_major_axis,eccentricity,inclination,longitude_ascending_node,argument_periapsis,true_anomaly_epoch)
             return body
         else:
-            self.type = "collision"
+            return celestial_object.initialize_collision_orbit(mass,mu,position,velocity)
+    
+    @classmethod
+    def initialize_collision_orbit(self,mass,mu,position,velocity):
+        pass
     
     ####### Export #######
     
