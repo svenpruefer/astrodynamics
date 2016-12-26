@@ -30,7 +30,8 @@ class celestial_body:
     ####### Init #######
     
     def __init__(self,mass,mu,semi_major_axis,eccentricity,inclination,longitude_ascending_node,argument_periapsis,true_anomaly_epoch):
-        # Initialization of class using classical orbital elements a, e, i, Omega, omega, nu_0
+
+        # Determination of orbit type
         self.semi_major_axis = semi_major_axis # a
         self.energy = - mu / ( 2.0 * self.semi_major_axis ) # E
         self.eccentricity = eccentricity # e
@@ -43,28 +44,61 @@ class celestial_body:
             self.type = "parabolic"
         else:
             self.type = "hyperbolic"
+
+        # Determination of plane of orbit
         self.inclination = inclination # i
         if inclination == 0:
             self.planar == True
         else:
             self.planar == False
         
+        # Angles for non-planar orbits
         if self.planar == False:
             self.longitude_ascending_node = longitude_ascending_node # Omega
             self.argument_periapsis = argument_periapsis # omega
         else:
-            self.longitude_ascending_node = 0
-            self.argument_periapsis = 0
+            self.longitude_ascending_node = False
+            self.argument_periapsis = False
+
+        # True anomaly at epoch, mass, fuel and propellant speed 
         self.true_anomaly_epoch = true_anomaly_epoch # nu
         self.mass = mass # m
-        self.parameter = semi_major_axis * (1 - eccentricity**2) # p
-        if ( 0 <= self.true_anomaly_epoch ) and ( self.true_anomaly_epoch <= np.pi):
-            self.eccentric_anomaly = np.arccos((self.eccentricity + np.cos(self.true_anomaly_epoch)) / (1 + self.eccentricity * np.cos(self.true_anomaly_epoch))) # E, at the moment the cases dont't cover everything.
+        self.fuel_fraction = 1
+        self.ejection_speed = 1
+        
+        # Parameter P
+        if self.type != "parabolic":
+            self.parameter = semi_major_axis * (1 - eccentricity**2) # p
         else:
-            self.eccentric_anomaly = 2 * np.pi - np.arccos((self.eccentricity + np.cos(self.true_anomaly_epoch)) / (1 + self.eccentricity * np.cos(self.true_anomaly_epoch))) # E
+            self.parameter = 1 # Fix this!
+
+        # Eccentric Anomaly
+        if self.type == "elliptic" or self.type == "circular":
+            if ( 0 <= self.true_anomaly_epoch ) and ( self.true_anomaly_epoch <= np.pi):
+                self.eccentric_anomaly = np.arccos((self.eccentricity + np.cos(self.true_anomaly_epoch)) / (1 + self.eccentricity * np.cos(self.true_anomaly_epoch))) # E, at the moment the cases dont't cover everything.
+            else:
+                self.eccentric_anomaly = 2 * np.pi - np.arccos((self.eccentricity + np.cos(self.true_anomaly_epoch)) / (1 + self.eccentricity * np.cos(self.true_anomaly_epoch))) # E
+
+        # Parabolic Anomaly
+        if self.type == "parabolic":
+            self.parabolic_anomaly = np.sqrt(self.parameter) * np.tan(self.true_anomaly / 2.0) # D
+
+        # Hyperbolic Anomaly
+        if self.type == "hyperbolic":
+            if ( 0 <= self.true_anomaly_epoch ) and ( self.true_anomaly_epoch <= np.pi):
+                self.hyperbolic_anomaly = np.arccosh((self.eccentricity + np.cos(self.true_anomaly_epoch)) / (1 + self.eccentricity * np.cos(self.true_anomaly_epoch))) # F
+            else:
+                self.hyperbolic_anomaly = - np.arccosh((self.eccentricity + np.cos(self.true_anomaly_epoch)) / (1 + self.eccentricity * np.cos(self.true_anomaly_epoch))) # F
+                
+        # Mean anomaly
         self.mean_anomaly = self.eccentric_anomaly - self.eccentricity * np.sin(self.eccentric_anomaly) # M
         self.mean_motion = np.sqrt(mu / self.semi_major_axis**3 ) # n
-        self.period = 2 * np.pi / np.sqrt(mu) * np.sqrt(self.semi_major_axis**3) # T
+
+        # Period
+        if self.type == "elliptical" or self.type == "circular":
+            self.period = 2 * np.pi / np.sqrt(mu) * np.sqrt(self.semi_major_axis**3) # T
+        else:
+            self.period = 0
         self.mu = mu # mu
         self.X = 0 # X for universal formulation of time of flight
     
