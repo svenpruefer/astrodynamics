@@ -1,26 +1,3 @@
-##############################
-# Import necessary libraries #
-##############################
-
-import numpy as np
-from scipy.optimize import fsolve
-
-##################################
-# Define various math functions. #
-##################################
-
-def norm(v):
-    return np.sqrt(np.dot(v,v))
-    
-def S(z):
-    return ( np.sqrt(z) - np.sin(np.sqrt(z)) ) / np.sqrt(z**3)
-
-def C(z):
-    return ( 1 - np.cos(np.sqrt(z)) ) / z
-
-######################################
-# Define class for celestial bodies. #
-######################################
 
 # This works at the moment only for elliptical (generic) orbits. Fix this!
 
@@ -99,14 +76,19 @@ class celestial_body:
             self.period = 2 * np.pi / np.sqrt(mu) * np.sqrt(self.semi_major_axis**3) # T
         else:
             self.period = 0
-        self.mu = mu # mu
+        
         self.X = 0 # X for universal formulation of time of flight
     
-    @classmethod
-    def from_position_velocity(self,mass,mu,position,velocity):
-        # Initialization of class using position and momentum
-        # For this purpose we need to calculate various intermediate objects. Should we save them for later? Is it more clever to just use position and momentum all the time?
-        
+    def __init__(self,position,velocity,mass=1,mu=1,fuel_fraction=1,ejection_speed=1):
+        # Initialization of class using position and momentum. For this purpose we need to calculate various intermediate objects.
+
+        # Technical properties of object
+        self.mu = mu
+        self.mass = mass
+        self.fuel_fraction = 1
+        self.ejection_speed = 1
+
+        # Determine type of orbit
         h = np.cross(position,velocity) # Calculate angular momentum h
         if h != [0,0,0]:
             n = np.cross(np.array([0,0,1],float),h) # Calculate node vector
