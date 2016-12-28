@@ -45,8 +45,8 @@ class celestial_body_on_nonplanar_parabolic_orbit(celestial_body):
         self.parabolic_anomaly = np.sqrt(self.parameter) * np.tan(self.true_anomaly / 2.0) # D
                 
         # Mean anomaly
-        self.mean_anomaly = self.eccentric_anomaly - self.eccentricity * np.sin(self.eccentric_anomaly) # M
-        self.mean_motion = np.sqrt(mu / self.semi_major_axis**3 ) # n
+        self.mean_anomaly = self.parameter * self.parabolic_anomaly + 1.0 / 3 * self.parabolic_anomaly**3
+        self.mean_motion = 2 * np.sqrt(mu) # n
 
         #Universal time of flight
         self.X = 0 # X
@@ -75,7 +75,7 @@ class celestial_body_on_nonplanar_parabolic_orbit(celestial_body):
         return position, velocity
     
     def export_orbit(self,number_points=60):
-        # Returns a list of three dimensional coordinates for the orbit.
+        # Returns a list of three dimensional coordinates for the orbit. Remove point opposite perigree.
         position = np.zeros( (number_points,3) )
         interval = 2 * np.pi / number_points
         for i in range(number_points):
@@ -86,24 +86,21 @@ class celestial_body_on_nonplanar_parabolic_orbit(celestial_body):
     
     def advance_in_time(self,delta_t):
         # This method advances the object on its course by delta t in time. This means that it needs to translate the time difference into changes in the true anomaly at epoch and then add this number to the existing value.
-            # delta_t should be small enough such that the body does not evolve more than one period. Is this necessary?
+        # delta_t should be small enough such that the body does not evolve more than one period. Is this necessary?
         
         # Update mean anomaly. Ignore full rotations.
         new_mean_anomaly = self.mean_motion * delta_t + self.mean_anomaly
         
         # Solve E-e*sin(E)=M numerically
-        new_eccentric_anomaly = fsolve(lambda E : E - self.eccentricity * np.sin(E) -new_mean_anomaly,new_mean_anomaly) 
+        new_parabolic_anomaly = fsolve(lambda D : self.parameter * D + 1.0 / 3 * D**3 - new_mean_anomaly, new_mean_anomaly) 
         
         # Calculate new true anomaly at epoch
-        if new_eccentric_anomaly <= np.pi:
-            new_true_anomaly_epoch = np.arccos( ( np.cos(new_eccentric_anomaly) - self.eccentricity ) / ( 1 - self.eccentricity * np.cos(new_eccentric_anomaly)))
-        else:
-            new_true_anomaly_epoch = 2 * np.pi - np.arccos( ( np.cos(new_eccentric_anomaly) - self.eccentricity ) / ( 1 - self.eccentricity * np.cos(new_eccentric_anomaly)))
+        new_true_anomaly_epoch = 2 * np.arctan( new_parabolic_anomaly / np.sqrt(self.parameter) )
             
         # Update values of true anomaly at epoch and eccentric anomaly and mean anomaly
         self.true_anomaly_epoch = new_true_anomaly_epoch
         self.mean_anomaly = new_mean_anomaly
-        self.eccentric_anomaly = new_eccentric_anomaly
+        self.parabolic_anomaly = new_parabolic_anomaly
         
     def t_in_dep_of_X(self, X):
         r_0, v_0 = self.export_postion_velocity()
@@ -118,12 +115,8 @@ class celestial_body_on_nonplanar_parabolic_orbit(celestial_body):
     def advance_in_true_anomaly(self,delta_nu):
         # This method increases the true anomaly by a given input. It can be used to find equi-distant-angle points on the orbit for visualization purposes. It also updates eccentric anomaly and mean anomaly.
         self.true_anomaly_epoch = self.true_anomaly_epoch + delta_nu
-        if self.true_anomaly_epoch <= np.pi:
-            self.eccentric_anomaly = np.arccos( ( np.cos(self.true_anomaly_epoch) + self.eccentricity ) / ( 1 + self.eccentricity * np.cos(self.true_anomaly_epoch)))
-        else:
-            self.eccentric_anomaly = 2 * np.pi - np.arccos( ( np.cos(self.true_anomaly_epoch) + self.eccentricity ) / ( 1 + self.eccentricity * np.cos(self.true_anomaly_epoch)))
-
-        self.mean_anomaly = self.eccentric_anomaly - self.eccentricity * np.sin( self.eccentric_anomaly )
+        self.parabolic_anomaly = np.sqrt(self.parameter) * np.tan( self.true_anomaly / 2.0 )
+        self.mean_anomaly = self.parameter * self.parabolic_anomaly + 1.0 / 3 * self.parabolic_anomaly**3
         
     def calculate_advance_in_true_anomaly(self,delta_nu):
         # This method advances the object on its course by delta nu in true anomaly and returns the new position. It is useful for calculating points on the orbit without actually advancing the object itself.
@@ -151,19 +144,18 @@ class celestial_body_on_nonplanar_parabolic_orbit(celestial_body):
 # Define class for planar elliptic celestial bodies. #
 #####################################################
 
-class celestial_body_on_planar_elliptic_orbit(celestial_body):
+class celestial_body_on_planar_parabolic_orbit(celestial_body):
     def __init__(self, position, velocity, mass = 1, mu = 1, ejection_speed = 1, fuel_fraction = 1):
         # Determination of orbit type
-        self.typ = "elliptical"
+        self.typ = "parabolic"
         self.planar = True
 
         h = np.cross(position,velocity) # Calculate angular momentum h
         e = 1.0 / mu * ((np.dot(velocity,velocity) - mu / norm(position)) * position - np.dot(position,velocity) * velocity) # Calculate eccentricity vector pointing in direction of perihelion
         p = np.dot(h,h) / mu
-        
-        self.semi_major_axis = p / (1-np.dot(e,e))
+        self.parameter = p
         self.eccentricity = norm(e)
-                
+        
         self.argument_periapsis = np.arccos(np.dot(np.array([1,0,0],float),e) / (norm(e)))
         
         if np.dot(position,velocity) >= 0:
@@ -171,22 +163,15 @@ class celestial_body_on_planar_elliptic_orbit(celestial_body):
         else:
             self.true_anomaly_epoch = 2 * np.pi - np.arccos(np.dot(e,position) / (norm(e) * norm(position)))
 
-        self.energy = - mu / ( 2.0 * self.semi_major_axis ) # E
-        self.parameter = semi_major_axis * (1 - eccentricity**2) # p
-        
-        # Eccentric Anomaly
-        if ( 0 <= self.true_anomaly_epoch ) and ( self.true_anomaly_epoch <= np.pi):
-            self.eccentric_anomaly = np.arccos((self.eccentricity + np.cos(self.true_anomaly_epoch)) / (1 + self.eccentricity * np.cos(self.true_anomaly_epoch))) # E
-        else:
-            self.eccentric_anomaly = 2 * np.pi - np.arccos((self.eccentricity + np.cos(self.true_anomaly_epoch)) / (1 + self.eccentricity * np.cos(self.true_anomaly_epoch))) # E
+        self.energy = 0 # E
+
+        # Parabolic Anomaly
+        self.parabolic_anomaly = np.sqrt(self.parameter) * np.tan(self.true_anomaly / 2.0) # D
                 
         # Mean anomaly
-        self.mean_anomaly = self.eccentric_anomaly - self.eccentricity * np.sin(self.eccentric_anomaly) # M
-        self.mean_motion = np.sqrt(mu / self.semi_major_axis**3 ) # n
+        self.mean_anomaly = self.parameter * self.parabolic_anomaly + 1.0 / 3 * self.parabolic_anomaly**3
+        self.mean_motion = 2 * np.sqrt(mu) # n
 
-        # Period
-        self.period = 2 * np.pi / np.sqrt(mu) * np.sqrt(self.semi_major_axis**3) # T
-        
         #Universal time of flight
         self.X = 0 # X
     
@@ -214,7 +199,7 @@ class celestial_body_on_planar_elliptic_orbit(celestial_body):
         return position, velocity
     
     def export_orbit(self,number_points=60):
-        # Returns a list of three dimensional coordinates for the orbit.
+        # Returns a list of three dimensional coordinates for the orbit. Remove point opposite of perigree.
         position = np.zeros( (number_points,3) )
         interval = 2 * np.pi / number_points
         for i in range(number_points):
@@ -226,23 +211,20 @@ class celestial_body_on_planar_elliptic_orbit(celestial_body):
     def advance_in_time(self,delta_t):
         # This method advances the object on its course by delta t in time. This means that it needs to translate the time difference into changes in the true anomaly at epoch and then add this number to the existing value.
         # delta_t should be small enough such that the body does not evolve more than one period. Is this necessary?
-        
+
         # Update mean anomaly. Ignore full rotations.
         new_mean_anomaly = self.mean_motion * delta_t + self.mean_anomaly
         
         # Solve E-e*sin(E)=M numerically
-        new_eccentric_anomaly = fsolve(lambda E : E - self.eccentricity * np.sin(E) - new_mean_anomaly,new_mean_anomaly) 
+        new_parabolic_anomaly = fsolve(lambda D : self.parameter * D + 1.0 / 3 * D**3 - new_mean_anomaly, new_mean_anomaly) 
         
         # Calculate new true anomaly at epoch
-        if new_eccentric_anomaly <= np.pi:
-            new_true_anomaly_epoch = np.arccos( ( np.cos(new_eccentric_anomaly) - self.eccentricity ) / ( 1 - self.eccentricity * np.cos(new_eccentric_anomaly)))
-        else:
-            new_true_anomaly_epoch = 2 * np.pi - np.arccos( ( np.cos(new_eccentric_anomaly) - self.eccentricity ) / ( 1 - self.eccentricity * np.cos(new_eccentric_anomaly)))
+        new_true_anomaly_epoch = 2 * np.arctan( new_parabolic_anomaly / np.sqrt(self.parameter) )
             
         # Update values of true anomaly at epoch and eccentric anomaly and mean anomaly
         self.true_anomaly_epoch = new_true_anomaly_epoch
         self.mean_anomaly = new_mean_anomaly
-        self.eccentric_anomaly = new_eccentric_anomaly
+        self.parabolic_anomaly = new_parabolic_anomaly
         
     def t_in_dep_of_X(self, X):
         r_0, v_0 = self.export_postion_velocity()
@@ -255,14 +237,11 @@ class celestial_body_on_planar_elliptic_orbit(celestial_body):
         new_X = fsolve(lambda X : self.t_in_dep_of_X(X) - delta_t,delta_t)
         
     def advance_in_true_anomaly(self,delta_nu):
-        # This method increases the true anomaly by a given input. It can be used to find equi-distant-angle points on the orbit for visualization purposes. It also updates eccentric anomaly and mean anomaly.
-        self.true_anomaly_epoch = self.true_anomaly_epoch + delta_nu
-        if self.true_anomaly_epoch <= np.pi:
-            self.eccentric_anomaly = np.arccos( ( np.cos(self.true_anomaly_epoch) + self.eccentricity ) / ( 1 + self.eccentricity * np.cos(self.true_anomaly_epoch)))
-        else:
-            self.eccentric_anomaly = 2 * np.pi - np.arccos( ( np.cos(self.true_anomaly_epoch) + self.eccentricity ) / ( 1 + self.eccentricity * np.cos(self.true_anomaly_epoch)))
+        # This method increases the true anomaly by a given input. It can be used to find equi-distant-angle points on the orbit for visualization purposes. It also updates parabolic anomaly and mean anomaly.
 
-        self.mean_anomaly = self.eccentric_anomaly - self.eccentricity * np.sin( self.eccentric_anomaly )
+        self.true_anomaly_epoch = self.true_anomaly_epoch + delta_nu
+        self.parabolic_anomaly = np.sqrt(self.parameter) * np.tan( self.true_anomaly / 2.0 )
+        self.mean_anomaly = self.parameter * self.parabolic_anomaly + 1.0 / 3 * self.parabolic_anomaly**3
         
     def calculate_advance_in_true_anomaly(self,delta_nu):
         # This method advances the object on its course by delta nu in true anomaly and returns the new position. It is useful for calculating points on the orbit without actually advancing the object itself.
