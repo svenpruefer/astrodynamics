@@ -14,21 +14,12 @@ from scipy.optimize import fsolve
 class celestial_body_on_collision_orbit(celestial_body):
     def __init__(self, position, velocity, mass = 1, mu = 1, ejection_speed = 1, fuel_fraction = 1):
         # Determination of orbit type. Should this class know wether it is planar?
-        self.typ = "collission"
+        self.typ = "collision"
         
-        self.inclination = np.arccos(h[2] / norm(h))
-
-        if e[2] >= 0:
-            self.argument_periapsis = np.arccos(np.dot(n,e) / (norm(n) * norm(e))) # Fix this.
-        else:
-            self.argument_periapsis = 2 * np.pi - np.arccos(np.dot(n,e) / (norm(n) * norm(e)))
-
-        if np.dot(position,velocity) >= 0:
-            self.true_anomaly_epoch = np.arccos(np.dot(e,position) / (norm(e) * norm(position))) # Fix this.
-        else:
-            self.true_anomaly_epoch = 2 * np.pi - np.arccos(np.dot(e,position) / (norm(e) * norm(position)))
-
+        self.inclination = np.arccos(np.dot(np.array([0,0,1],float),position) / norm(position)) # i
         self.energy = mass * np.dot(velocity,velocity) / 2.0 - mu / norm(position) # E        
+        self.position = position
+        self.velocity = velocity
         
         #Universal time of flight
         self.X = 0 # X
@@ -36,92 +27,46 @@ class celestial_body_on_collision_orbit(celestial_body):
         ####### Export #######
         
     def export_position_velocity(self):
-        # Exports position and velocity of celestial body. How should time dependence be incorparated? Should it be a parameter for this function?
-        r = self.parameter  / ( 1 + self.eccentricity * np.cos(self.true_anomaly_epoch))
-            
-        # The perifocal coordinate system uses coordinate axes P, Q, W in this order, where P points in the direction of the periapsis and Q is perpendicular in positive direction in the plane of the orbit.
-        position_perifocal_system = np.array([r * np.cos(self.true_anomaly_epoch),r * np.sin(self.true_anomaly_epoch),0],float)
-        velocity_perifocal_system = np.sqrt(self.mu / self.parameter) * np.array([-np.sin(self.true_anomaly_epoch),self.eccentricity + np.cos(self.true_anomaly_epoch),0],float)
-        
-        # Calculate the rotation matrix from perifocal to fixed frame. Bate says, one should avoid this technique.
-        rotation_matrix = np.array([[np.cos(self.longitude_ascending_node) * np.cos(self.argument_periapsis) - np.sin(self.longitude_ascending_node) * np.sin(self.argument_periapsis) * np.cos(self.inclination) , - np.cos(self.longitude_ascending_node) * np.sin(self.argument_periapsis) - np.sin(self.longitude_ascending_node) * np.cos(self.argument_periapsis) * np.cos(self.inclination) , np.sin(self.longitude_ascending_node) * np.sin(self.inclination)],\
-        [np.sin(self.longitude_ascending_node) * np.cos(self.argument_periapsis) + np.cos(self.longitude_ascending_node) * np.sin(self.argument_periapsis) * np.cos(self.inclination) , - np.sin(self.longitude_ascending_node) * np.sin(self.argument_periapsis) + np.cos(self.longitude_ascending_node) * np.cos(self.argument_periapsis) * np.cos(self.inclination) , - np.cos(self.longitude_ascending_node) * np.sin(self.inclination)],\
-        [np.sin(self.argument_periapsis) * np.sin(self.inclination) , np.cos(self.argument_periapsis) * np.sin(self.inclination) , np.cos(self.inclination)]\
-            ],float)
-        
-        position = np.dot(rotation_matrix,position_perifocal_system)
-        velocity = np.dot(rotation_matrix,velocity_perifocal_system)
-        
-        return position, velocity
+        # Exports position and velocity of celestial body.
+        return self.position, self.velocity
     
     def export_orbit(self,number_points=60):
-        # Returns a list of three dimensional coordinates for the orbit.
+        # Returns a list of three dimensional coordinates for the orbit. Perhaps plus most distant point?
+        
         position = np.zeros( (number_points,3) )
-        interval = 2 * np.pi / number_points
+        interval = norm(self.position) / number_points # Completely arbitrary, fix this!
         for i in range(number_points):
             position[i,:] = self.calculate_advance_in_true_anomaly(i * interval)[0]
-        return np.vstack( (position,position[0,:]) )
+        return position # Orbit is non-periodic.
         
     ###### Advance along orbit #######
     
     def advance_in_time(self,delta_t):
-        # This method advances the object on its course by delta t in time. This means that it needs to translate the time difference into changes in the true anomaly at epoch and then add this number to the existing value.
-            # delta_t should be small enough such that the body does not evolve more than one period. Is this necessary?
+        # This method advances the object on its course by delta t in time. It needs to integrate the equation of motion or solve it. How? Temporarily it will just use naive Euler integration.
         
-        # Update mean anomaly. Ignore full rotations.
-        new_mean_anomaly = self.mean_motion * delta_t + self.mean_anomaly
-        
-        # Solve E-e*sin(E)=M numerically
-        new_eccentric_anomaly = fsolve(lambda E : E - self.eccentricity * np.sin(E) -new_mean_anomaly,new_mean_anomaly) 
-        
-        # Calculate new true anomaly at epoch
-        if new_eccentric_anomaly <= np.pi:
-            new_true_anomaly_epoch = np.arccos( ( np.cos(new_eccentric_anomaly) - self.eccentricity ) / ( 1 - self.eccentricity * np.cos(new_eccentric_anomaly)))
-        else:
-            new_true_anomaly_epoch = 2 * np.pi - np.arccos( ( np.cos(new_eccentric_anomaly) - self.eccentricity ) / ( 1 - self.eccentricity * np.cos(new_eccentric_anomaly)))
-            
-        # Update values of true anomaly at epoch and eccentric anomaly and mean anomaly
-        self.true_anomaly_epoch = new_true_anomaly_epoch
-        self.mean_anomaly = new_mean_anomaly
-        self.eccentric_anomaly = new_eccentric_anomaly
+        new_position = self.position + delta_t * self.velocity
+        new_velocity = self.velocity + delta_t * self.mu / self.position**2
+        self.position = new_position
+        self.velocity = new_velocity
         
     def t_in_dep_of_X(self, X):
+        # Is this still applicable for collision  orbits?
         r_0, v_0 = self.export_postion_velocity()
         return 1 / np.sqrt(self.mu) * ( np.dot(r_0,v_0) /np.sqrt(self.mu) * X**2 * C(X) + ( 1 - norm(r_0) / self.semi_major_axis ) * X**3 * S(X) + norm(r_0) * X )
     
     def advance_in_time_universal(self,delta_t):
-        # This method advances the object on its course by delta t in time using the universal time of fligt formulation. This means it should be usable for all kinds of orbits.
+        # This method advances the object on its course by delta t in time using the universal time of fligt formulation. Is this applicable to collision orbits?
         
         # Solve for new X
         new_X = fsolve(lambda X : self.t_in_dep_of_X(X) - delta_t,delta_t)
         
     def advance_in_true_anomaly(self,delta_nu):
-        # This method increases the true anomaly by a given input. It can be used to find equi-distant-angle points on the orbit for visualization purposes. It also updates eccentric anomaly and mean anomaly.
-        self.true_anomaly_epoch = self.true_anomaly_epoch + delta_nu
-        if self.true_anomaly_epoch <= np.pi:
-            self.eccentric_anomaly = np.arccos( ( np.cos(self.true_anomaly_epoch) + self.eccentricity ) / ( 1 + self.eccentricity * np.cos(self.true_anomaly_epoch)))
-        else:
-            self.eccentric_anomaly = 2 * np.pi - np.arccos( ( np.cos(self.true_anomaly_epoch) + self.eccentricity ) / ( 1 + self.eccentricity * np.cos(self.true_anomaly_epoch)))
-
-        self.mean_anomaly = self.eccentric_anomaly - self.eccentricity * np.sin( self.eccentric_anomaly )
-        
+        # What is this supposed to do for collision orbits?
+        pass
+    
     def calculate_advance_in_true_anomaly(self,delta_nu):
         # This method advances the object on its course by delta nu in true anomaly and returns the new position. It is useful for calculating points on the orbit without actually advancing the object itself.
-        new_true_anomaly_epoch = self.true_anomaly_epoch + delta_nu
+        # How should this work?
         
-        r = self.parameter  / ( 1 + self.eccentricity * np.cos(new_true_anomaly_epoch))
-        
-        # The perifocal coordinate system uses coordinate axes P, Q, W in this order, where P points in the direction of the periapsis and Q is perpendicular in positive direction in the plane of the orbit.
-        position_perifocal_system = np.array([r * np.cos(new_true_anomaly_epoch),r * np.sin(new_true_anomaly_epoch),0],float)
-        velocity_perifocal_system = np.sqrt(self.mu / self.parameter) * np.array([-np.sin(new_true_anomaly_epoch),self.eccentricity + np.cos(new_true_anomaly_epoch),0],float)
-        
-        # Calculate the rotation matrix from perifocal to fixed frame. Bate says, one should avoid this technique.
-        rotation_matrix = np.array([[np.cos(self.longitude_ascending_node) * np.cos(self.argument_periapsis) - np.sin(self.longitude_ascending_node) * np.sin(self.argument_periapsis) * np.cos(self.inclination) , - np.cos(self.longitude_ascending_node) * np.sin(self.argument_periapsis) - np.sin(self.longitude_ascending_node) * np.cos(self.argument_periapsis) * np.cos(self.inclination) , np.sin(self.longitude_ascending_node) * np.sin(self.inclination)],\
-        [np.sin(self.longitude_ascending_node) * np.cos(self.argument_periapsis) + np.cos(self.longitude_ascending_node) * np.sin(self.argument_periapsis) * np.cos(self.inclination) , - np.sin(self.longitude_ascending_node) * np.sin(self.argument_periapsis) + np.cos(self.longitude_ascending_node) * np.cos(self.argument_periapsis) * np.cos(self.inclination) , - np.cos(self.longitude_ascending_node) * np.sin(self.inclination)],\
-        [ np.sin(self.argument_periapsis) * np.sin(self.inclination) , np.cos(self.argument_periapsis) * np.sin(self.inclination) , np.cos(self.inclination)]\
-        ],float)
-            
-        position = np.dot(rotation_matrix,position_perifocal_system)
-        velocity = np.dot(rotation_matrix,velocity_perifocal_system)
         
         return position, velocity
