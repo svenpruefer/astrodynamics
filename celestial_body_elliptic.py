@@ -3,13 +3,13 @@
 ##############################
 
 from functions import *
-from celestial_body import *
+from celestial_body_base import test
 import numpy as np
 from scipy.optimize import fsolve
 
-#################################################
-# Define class for non-planar celestial bodies. #
-#################################################
+############################################################
+# Define class for non-planar elliptical celestial bodies. #
+############################################################
 
 class celestial_body_on_nonplanar_elliptic_orbit(celestial_body):
     def __init__(self, position, velocity, mass = 1, mu = 1, ejection_speed = 1, fuel_fraction = 1):

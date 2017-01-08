@@ -2,7 +2,12 @@
 # Import necessary classes and libraries #
 ##########################################
 
-from celestial_object import *
+from celestial_body_base import *
+#from celestial_body_elliptic import *
+#from celestial_body_hyperbolic import *
+#from celestial_body_parabolic import *
+#from celestial_body_collision import *
+#from celestial_body_create import *
 import numpy as np
 from scipy.optimize import fsolve
 
@@ -21,7 +26,7 @@ def kepler_problem(mass_1,position_1,velocity_1,mass_2,position_2,velocity_2):
     relative_position = position_1 - position_2
     relative_velocity = velocity_1 - velocity_2
     
-    total_body = celestial_body.from_position_velocity(mass_1,mu,relative_position,relative_velocity)
+    total_body = celestial_body.create_object(relative_position,relative_velocity)
     
     #position_1_in_center_of_mass_system = mu / mass_1 * total_body.export_position_velocity()[0]
     #position_2_in_center_of_mass_system = - mu / mass_2 * total_body.export_position_velocity()[0]

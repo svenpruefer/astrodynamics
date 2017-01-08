@@ -3,10 +3,10 @@
 ##############################
 
 from functions import *
-from celestial_body import *
+from celestial_body_base import *
 import numpy as np
 from scipy.optimize import fsolve
-
+ 
 ######################################
 # Define class for colission orbits. #
 ######################################
@@ -21,22 +21,35 @@ class celestial_body_on_collision_orbit(celestial_body):
         self.position = position
         self.velocity = velocity
         
-        #Universal time of flight
-        self.X = 0 # X
-    
-        ####### Export #######
+    ####### Export #######
         
     def export_position_velocity(self):
         # Exports position and velocity of celestial body.
         return self.position, self.velocity
     
-    def export_orbit(self,number_points=60):
+    def export_orbit(self):
         # Returns a list of three dimensional coordinates for the orbit. Perhaps plus most distant point?
+
+        if self.energy >= 0:
+            if np.dot(self.position,self.velocity) >= 0:
+                position = np.zeros( (2,3) )
+                position[0,:] = self.position
+                position[1,:] = 5 * self.position
+            else:
+                position = np.zeros( (2,3) )
+                position[0,:] = self.position
+                position[1,:] = [0,0,0]
+        else:
+            if np.dot(self.position,self.velocity) < 0:
+                position = np.zeros( (2,3) )
+                position[0,:] = self.position
+                position[1,:] = [0,0,0]
+            else:
+                maximum_distance = - self.energy / mu
+                position = np.zeros( (2,3) )
+                position[0,:] = self.position / norm(self.position) * maximum_distance
+                position[1,:] = [0,0,0]
         
-        position = np.zeros( (number_points,3) )
-        interval = norm(self.position) / number_points # Completely arbitrary, fix this!
-        for i in range(number_points):
-            position[i,:] = self.calculate_advance_in_true_anomaly(i * interval)[0]
         return position # Orbit is non-periodic.
         
     ###### Advance along orbit #######

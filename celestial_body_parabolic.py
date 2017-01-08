@@ -4,7 +4,7 @@
 ##############################
 
 from functions import *
-from celestial_body import *
+from celestial_body_base import *
 import numpy as np
 from scipy.optimize import fsolve
 
