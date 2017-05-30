@@ -25,13 +25,23 @@ mu = 1.0 # Gravitational Parameter, equal to product of gravitational constant a
 # Define Objects #
 ###################
 
+# Elliptic Test Case
+
 position_1 = np.array([3.0 / 4 * np.sqrt(3), 3.0 /4, 0],float)
 velocity_1 = np.array([-1.0/(2*np.sqrt(2)), np.sqrt(3) / (1.6 * np.sqrt(2)), 0],float)
 test_body_1 = celestial_body.create_object(position_1,velocity_1)
 
+# Hyperbolic Test Case
+
 position_2 = np.array([0.4, 1, 0],float)
 velocity_2 = np.array([1.2, 0.7, 0],float)
 test_body_2 = celestial_body.create_object(position_2,velocity_2)
+
+# Collision Test Case
+
+position_3 = np.array([3.0 / 4 * np.sqrt(3), 3.0 /4, 0],float)
+velocity_3 = np.array([0, 0 , 0],float)
+test_body_3 = celestial_body.create_object(position_3,velocity_3)
 
 #############
 # Plotting #
@@ -53,9 +63,11 @@ def plot(body):
     #Orbit
     plt.plot(orbit[:,0],orbit[:,1])
     
-plot(test_body_2)
-test_body_2.advance_in_true_anomaly(0.3)
-plot(test_body_2)
+for i in range(20):
+    if i%4 == 0:
+        plot(test_body_1)
+    test_body_1.advance_in_true_anomaly(1 / 10)
+plot(test_body_1)
 
 plt.xlim(-3,3)
 plt.ylim(-3,3)

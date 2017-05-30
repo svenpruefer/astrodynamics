@@ -1015,7 +1015,7 @@ class celestial_body_on_collision_orbit(celestial_body):
         # Exports position and velocity of celestial body.
         return self.position, self.velocity
     
-    def export_orbit(self):
+    def export_orbit(self,number_of_points):
         # Returns a list of three dimensional coordinates for the orbit. Perhaps plus most distant point?
 
         if self.energy >= 0:
@@ -1033,7 +1033,7 @@ class celestial_body_on_collision_orbit(celestial_body):
                 position[0,:] = self.position
                 position[1,:] = [0,0,0]
             else:
-                maximum_distance = - self.energy / mu
+                maximum_distance = - self.mu / self.energy
                 position = np.zeros( (2,3) )
                 position[0,:] = self.position / norm(self.position) * maximum_distance
                 position[1,:] = [0,0,0]
@@ -1046,7 +1046,7 @@ class celestial_body_on_collision_orbit(celestial_body):
         # This method advances the object on its course by delta t in time. It needs to integrate the equation of motion or solve it. How? Temporarily it will just use naive Euler integration.
         
         new_position = self.position + delta_t * self.velocity
-        new_velocity = self.velocity + delta_t * self.mu / self.position**2
+        new_velocity = self.velocity - delta_t * self.position * self.mu / norm(self.position)**3
         self.position = new_position
         self.velocity = new_velocity
         
